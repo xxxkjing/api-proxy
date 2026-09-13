@@ -16,7 +16,7 @@ function run(env, handler, stream = true) {
       let sc = 0, body = null, writes = [];
       const res = {
         setHeader: () => {}, status: (c) => { sc = c; return { json: (d) => { body = JSON.stringify(d); }, send: (t) => { body = t; } }; },
-        write: (t) => writes.push(t), end: () => {},
+        send: (t) => { body = t; }, write: (t) => writes.push(t), end: () => {},
       };
       const req = { method: "POST", url: "/v1/chat/completions", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "gpt-x", stream }) };
       await mod(req, res);
