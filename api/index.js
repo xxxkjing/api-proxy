@@ -1,34 +1,27 @@
-const API_KEYS = process.env.API_KEYS ?
-  process.env.API_KEYS.split(',').map(key => key.trim()).filter(Boolean) :
+const API_KEYS = process.env.KEYS || process.env.API_KEYS ?
+  (process.env.KEYS || process.env.API_KEYS).split(',').map(key => key.trim()).filter(Boolean) :
   [];
 const BASE_URL = process.env.BASE_URL || 'https://api.openai.com';
 
-let currentKeyIndex = 0;
+// 每个 key 的状态：lastUsed 上次调用时间戳（用于冷却）、callCount 累计调用次数（用于选最没调用的）
+let keyStates = API_KEYS.map(key => ({ key, lastUsed: 0, callCount: 0 }));
+const COOLDOWN_MS = 5000; // 每次调用后冷却 5 秒
 
-async function handleStream(response, res) {
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let done = false;
-
-  while (!done) {
-    const { value, done: streamDone } = await reader.read();
-    done = streamDone;
-    if (value) {
-      const chunk = decoder.decode(value, { stream: true });
-      res.write(chunk);
-    }
+function pickKey({ preferLeastUsed = false } = {}) {
+  const now = Date.now();
+  // 默认只从未冷却的 key 里随机选；全冷却时退化为全部
+  let pool = keyStates.filter(k => now - k.lastUsed >= COOLDOWN_MS);
+  if (!pool.length) pool = [...keyStates];
+  if (!pool.length) return null;
+  // 429 场景：选「最没调用过」的（callCount 最小，并列则随机）
+  if (preferLeastUsed) {
+    const min = Math.min(...pool.map(k => k.callCount));
+    pool = pool.filter(k => k.callCount === min);
   }
-
-  res.end();
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function handleNonStream(response, res) {
-  const data = await response.json();
-  res.status(response.status).json(data);
-}
-
-async function proxyRequest(req, res, apiKey) {
-  // 修改这里的逻辑以适应新的路由
+async function proxyRequest(req, apiKey) {
   const url = req.url;
   let targetUrl;
   if (url.startsWith('/api')) {
@@ -36,8 +29,6 @@ async function proxyRequest(req, res, apiKey) {
   } else {
     targetUrl = `${BASE_URL}${url}`;
   }
-
-  console.log('targetUrl:', targetUrl);
 
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
@@ -55,35 +46,19 @@ async function proxyRequest(req, res, apiKey) {
     }
   }
 
-  try {
-    const response = await fetch(targetUrl, {
-      method: req.method,
-      headers: headers,
-      body: body,
-    });
+  const response = await fetch(targetUrl, {
+    method: req.method,
+    headers: headers,
+    body: body,
+  });
 
-    // 添加这行日志，打印完整的 Headers 对象
-    console.log('Response headers from target:', response.headers);
-
-    // 记录完整的响应体
-    const responseText = await response.text();
-    console.log('Response body from target:', responseText);
-
-    // 只转发这两个标头
-    const headersToForward = ['content-type', 'authorization'];
-    for (const [key, value] of response.headers.entries()) {
-      if (headersToForward.includes(key.toLowerCase())) {
-        res.setHeader(key, value);
-      }
-    }
-    
-    // 将原始响应体发送给客户端
-    res.status(response.status).send(responseText);
-
-  } catch (error) {
-    console.error('Proxy error:', error);
-    throw error;
-  }
+  const responseText = await response.text();
+  return {
+    status: response.status,
+    body: responseText,
+    contentType: response.headers.get('content-type'),
+    authorization: response.headers.get('authorization'),
+  };
 }
 
 module.exports = async (req, res) => {
@@ -96,8 +71,6 @@ module.exports = async (req, res) => {
     return;
   }
 
-  console.log('Available API keys:', API_KEYS.length);
-
   if (!API_KEYS.length) {
     return res.status(500).json({
       error: {
@@ -109,26 +82,44 @@ module.exports = async (req, res) => {
     });
   }
 
-  let retries = 0;
-  const maxRetries = API_KEYS.length;
+  let attempts = 0;
+  const maxAttempts = Math.max(API_KEYS.length, 3);
+  let hit429 = false;
 
-  while (retries < maxRetries) {
-    const apiKey = API_KEYS[currentKeyIndex];
-    currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  while (attempts < maxAttempts) {
+    // 正常时随机选未冷却 key；遇到 429 后改选「最没调用过」的 key
+    const state = pickKey({ preferLeastUsed: hit429 });
+    if (!state) break;
+    state.lastUsed = Date.now(); // 调用即进入冷却
 
     try {
-      await proxyRequest(req, res, apiKey);
+      const result = await proxyRequest(req, state.key);
+      state.callCount += 1;
+
+      if (result.status === 429) {
+        hit429 = true;
+        attempts += 1;
+        console.warn(`Key ${state.key.slice(0, 8)}... -> 429, switching to least-used key (${attempts}/${maxAttempts})`);
+        continue; // 不返回，直接换 key 重试
+      }
+
+      // 非 429：转发响应给客户端
+      for (const [header, value] of [
+        ['content-type', result.contentType],
+        ['authorization', result.authorization],
+      ]) {
+        if (value) res.setHeader(header, value);
+      }
+      res.status(result.status).send(result.body);
       return;
     } catch (error) {
-      retries++;
-      console.warn(`Request failed with key ${apiKey}, retrying... (${retries}/${maxRetries})`);
-      if (retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      console.error('Proxy error:', error);
+      state.callCount += 1;
+      attempts += 1;
     }
   }
 
-  return res.status(500).json({
+  return res.status(502).json({
     error: {
       message: `"All API keys failed"`,
       type: `"api_error"`,
