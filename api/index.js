@@ -36,7 +36,7 @@ function pickKey({ preferLeastUsed = false } = {}) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function proxyRequest(req, apiKey) {
+async function proxyRequest(req, res, apiKey) {
   const url = req.url;
   let targetUrl;
   if (url.startsWith('/api')) {
@@ -67,13 +67,35 @@ async function proxyRequest(req, apiKey) {
     body: body,
   });
 
+  const status = response.status;
+  const contentType = response.headers.get('content-type') || '';
+  const authorization = response.headers.get('authorization');
+
+  // 流式透传：SSE 且非错误状态 → 边读边写，首 token 即到即转（首字时间=上游首字时间，不再等完整响应）
+  const wantsStream = (typeof body === 'string' && body.includes('"stream":true'))
+    || contentType.includes('text/event-stream');
+  if (status !== 429 && status < 400 && wantsStream && response.body) {
+    res.status(status);
+    if (contentType) res.setHeader('content-type', contentType);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        res.write(decoder.decode(value, { stream: true }));
+      }
+    } catch (e) {
+      console.error('Stream error:', e);
+    } finally {
+      res.end();
+    }
+    return { status, handled: true, body: '', contentType, authorization };
+  }
+
+  // 非流式 / 错误响应：读完整文本
   const responseText = await response.text();
-  return {
-    status: response.status,
-    body: responseText,
-    contentType: response.headers.get('content-type'),
-    authorization: response.headers.get('authorization'),
-  };
+  return { status, handled: false, body: responseText, contentType, authorization };
 }
 
 module.exports = async (req, res) => {
@@ -120,7 +142,7 @@ module.exports = async (req, res) => {
     finalState.coolUntil = Date.now() + COOLDOWN_MS; // 调用后进入冷却
 
     try {
-      const result = await proxyRequest(req, finalState.key);
+      const result = await proxyRequest(req, res, finalState.key);
       finalState.callCount += 1;
 
       if (result.status === 429) {
@@ -130,6 +152,9 @@ module.exports = async (req, res) => {
         console.warn(`Key ${finalState.key.slice(0, 8)}... -> 429, penalized ${PENALTY_MS}ms (${attempts}/${maxAttempts})`);
         continue; // 不返回，直接换 key 重试
       }
+
+      // 流式已在 proxyRequest 内边读边写，直接完成
+      if (result.handled) return;
 
       // 非 429：转发响应给客户端
       for (const [header, value] of [
