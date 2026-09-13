@@ -3,109 +3,122 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>API Proxy 管理面板</title>
+<title>API Proxy</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
+  :root {
+    --bg: #ffffff;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --ink-3: #86868b;
+    --line: #e8e8ed;
+    --accent: #0066cc;
+    --danger: #d70015;
+    --ok: #1d1d1f;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: #0f172a; color: #e2e8f0; min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+    -webkit-font-smoothing: antialiased;
   }
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 64px 32px 120px; }
 
-  /* 登录页 */
-  #login-page { display: none; max-width: 360px; margin: 15vh auto 0; }
-  #login-page h1 { text-align: center; margin-bottom: 20px; font-size: 22px; }
+  /* 登录 */
+  #login-page { display: none; max-width: 340px; margin: 20vh auto 0; text-align: center; }
+  #login-page h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 40px; }
   #login-page input {
-    width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #334155;
-    background: #1e293b; color: #e2e8f0; margin-bottom: 12px; font-size: 14px;
+    width: 100%; padding: 12px 16px; border: 1px solid var(--line);
+    border-radius: 12px; font-size: 15px; text-align: center; outline: none;
+    transition: border-color .2s;
   }
-  #login-page button {
-    width: 100%; padding: 12px; border: none; border-radius: 8px;
-    background: #3b82f6; color: #fff; font-size: 15px; cursor: pointer;
+  #login-page input:focus { border-color: var(--accent); }
+  #login-btn {
+    width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 12px;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 500; cursor: pointer;
   }
-  #login-page button:hover { background: #2563eb; }
-  .login-err { color: #f87171; font-size: 13px; text-align: center; margin-top: 8px; min-height: 18px; }
+  #login-btn:hover { opacity: .9; }
+  .login-err { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 18px; }
 
-  /* 主面板 */
+  /* 顶部 */
   #panel { display: none; }
   .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #1e293b;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding-bottom: 24px; border-bottom: 1px solid var(--line); margin-bottom: 48px;
   }
-  .topbar h1 { font-size: 20px; }
-  .topbar .sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .topbar h1 { font-size: 32px; font-weight: 700; letter-spacing: -1px; }
+  .topbar .sub { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
   #logout-btn {
-    background: none; border: 1px solid #334155; color: #94a3b8;
-    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    background: none; border: none; color: var(--ink-3); font-size: 14px;
+    cursor: pointer; padding: 6px 0;
   }
-  #logout-btn:hover { color: #f87171; border-color: #f87171; }
+  #logout-btn:hover { color: var(--ink); }
 
-  /* 统计卡片 */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .card {
-    background: #1e293b; border-radius: 12px; padding: 16px;
+  /* 统计卡：极简数字排版 */
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 48px 24px; margin-bottom: 72px;
   }
-  .card .label { font-size: 12px; color: #94a3b8; margin-bottom: 8px; }
-  .card .value { font-size: 26px; font-weight: 700; }
-  .card .unit { font-size: 12px; color: #94a3b8; font-weight: 400; margin-left: 4px; }
-  .card .delta { font-size: 12px; color: #34d399; margin-top: 6px; }
+  .card .label { font-size: 13px; color: var(--ink-3); font-weight: 400; margin-bottom: 8px; }
+  .card .value { font-size: 34px; font-weight: 600; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .card .unit { font-size: 14px; color: var(--ink-3); font-weight: 400; margin-left: 2px; }
 
-  /* 图表 */
-  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
-  .chart-box { background: #1e293b; border-radius: 12px; padding: 16px; }
-  .chart-box h3 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; }
-  .charts .wide { grid-column: 1 / -1; }
+  /* 区块 */
+  .section { margin-bottom: 80px; }
+  .section-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 20px; }
+  .section-desc { font-size: 13px; color: var(--ink-3); margin: -14px 0 20px; }
+
+  /* 图表：极简网格线 */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .chart-box { min-width: 0; }
+  .chart-box.wide { grid-column: 1 / -1; }
+  .chart-box h3 { font-size: 13px; color: var(--ink-3); font-weight: 500; margin-bottom: 12px; }
 
   /* key 管理 */
-  .keys-section { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
-  .keys-section h3 { font-size: 16px; margin-bottom: 12px; }
-  .key-form { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .key-form { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
   .key-form input {
-    padding: 8px 12px; border-radius: 6px; border: 1px solid #334155;
-    background: #0f172a; color: #e2e8f0; font-size: 13px;
+    padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14px; outline: none; font-family: inherit;
   }
-  .key-form .name { width: 160px; }
-  .key-form .quota { width: 120px; }
+  .key-form input:focus { border-color: var(--accent); }
+  .key-form .name { width: 180px; }
+  .key-form .quota { width: 160px; }
   .key-form button {
-    padding: 8px 18px; border: none; border-radius: 6px;
-    background: #10b981; color: #fff; cursor: pointer; font-size: 13px;
+    padding: 9px 22px; border: none; border-radius: 10px;
+    background: var(--ink); color: #fff; font-size: 14px; cursor: pointer;
   }
-  .key-form button:hover { background: #059669; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #0f172a; }
-  th { color: #94a3b8; font-weight: 500; font-size: 12px; }
-  td .key-value { font-family: monospace; font-size: 12px; color: #93c5fd; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-  .badge.on { background: #064e3b; color: #34d399; }
-  .badge.off { background: #450a0a; color: #f87171; }
-  .quota-bar { position: relative; width: 90px; height: 6px; background: #0f172a; border-radius: 4px; }
-  .quota-bar span { display: block; height: 6px; border-radius: 4px; background: #3b82f6; }
-  .op-link { color: #60a5fa; cursor: pointer; margin-right: 8px; font-size: 12px; }
-  .op-link.danger { color: #f87171; }
+  .key-form button:hover { background: #333; }
 
-  /* 模型价格 */
-  .models-section { background: #1e293b; border-radius: 12px; padding: 16px; }
-  .models-section h3 { font-size: 16px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  td { color: var(--ink); }
+  .key-value { font-family: "SF Mono", Menlo, monospace; font-size: 13px; color: var(--ink-2); }
+  .badge { font-size: 12px; }
+  .badge.on::before { content: "● "; color: #1d1d1f; }
+  .badge.off::before { content: "● "; color: #d2d2d7; }
+  .quota-num { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); }
+  .op-link { color: var(--accent); cursor: pointer; font-size: 13px; margin-right: 14px; }
+  .op-link.danger { color: var(--danger); }
+  .op-link:hover { text-decoration: underline; }
 
   /* 日志 */
-  .logs-section { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
-  .logs-section h3 { font-size: 16px; margin-bottom: 12px; }
-  .log-table { font-size: 12px; }
-  .log-table td { padding: 7px 10px; }
-
-  .status-ok { color: #34d399; }
-  .status-err { color: #f87171; }
-  .hidden { display: none; }
+  .log-table { font-size: 13px; }
+  .log-table td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .status-ok { color: #1d1d1f; }
+  .status-err { color: var(--danger); }
+  .price-na { color: var(--ink-3); }
+  .source-tag { font-size: 12px; color: var(--ink-3); }
+  .num { font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
 <div class="container">
-  <!-- 登录页 -->
+  <!-- 登录 -->
   <div id="login-page">
-    <h1>🔐 API Proxy 管理面板</h1>
-    <input type="password" id="login-key" placeholder="请输入管理 API Key" autocomplete="off">
-    <button id="login-btn">登 录</button>
+    <h1>API&nbsp;Proxy</h1>
+    <input type="password" id="login-key" placeholder="管理密钥" autocomplete="off">
+    <button id="login-btn">进入</button>
     <div class="login-err" id="login-err"></div>
   </div>
 
@@ -113,63 +126,61 @@
   <div id="panel">
     <div class="topbar">
       <div>
-        <h1>API Proxy 监控台</h1>
+        <h1>API&nbsp;Proxy</h1>
         <div class="sub" id="meta-info">—</div>
       </div>
       <button id="logout-btn">退出</button>
     </div>
 
-    <!-- 统计卡片 -->
     <div class="cards">
       <div class="card"><div class="label">总请求</div><div class="value" id="c-requests">0</div></div>
       <div class="card"><div class="label">总 Token</div><div class="value" id="c-tokens">0</div></div>
-      <div class="card"><div class="label">平均首字延迟</div><div class="value" id="c-ttft">—<span class="unit">ms</span></div></div>
-      <div class="card"><div class="label">429 次数</div><div class="value" id="c-429">0</div></div>
-      <div class="card"><div class="label">预估费用</div><div class="value" id="c-cost">$0<span class="unit"></span></div></div>
+      <div class="card"><div class="label">首字延迟（流式）</div><div class="value" id="c-ttft">—<span class="unit">ms</span></div></div>
+      <div class="card"><div class="label">响应耗时（非流式）</div><div class="value" id="c-lat">—<span class="unit">ms</span></div></div>
+      <div class="card"><div class="label">429</div><div class="value" id="c-429">0</div></div>
+      <div class="card"><div class="label">费用</div><div class="value" id="c-cost">$0</div></div>
     </div>
 
-    <!-- 图表 -->
-    <div class="charts">
-      <div class="chart-box">
-        <h3>请求量 / RPM（每分钟）</h3>
-        <canvas id="chart-requests"></canvas>
-      </div>
-      <div class="chart-box">
-        <h3>Token 消耗（输入 / 输出）</h3>
-        <canvas id="chart-tokens"></canvas>
-      </div>
-      <div class="chart-box wide">
-        <h3>首字延迟 TTFT（ms，每分钟均值）</h3>
-        <canvas id="chart-ttft"></canvas>
+    <div class="section">
+      <div class="charts">
+        <div class="chart-box">
+          <h3>请求量 / 分钟</h3>
+          <canvas id="chart-requests"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>Token / 分钟</h3>
+          <canvas id="chart-tokens"></canvas>
+        </div>
+        <div class="chart-box wide">
+          <h3>延迟 / 分钟 · 首字（流式）与总耗时（非流式）</h3>
+          <canvas id="chart-latency"></canvas>
+        </div>
       </div>
     </div>
 
-    <!-- Key 管理 -->
-    <div class="keys-section">
-      <h3>🔑 API Key 管理</h3>
+    <div class="section">
+      <div class="section-title">API&nbsp;Key</div>
       <div class="key-form">
-        <input class="name" id="new-key-name" placeholder="名称，如：测试key">
-        <input class="quota" id="new-key-quota" placeholder="额度(token)，默认 1000000" type="number">
-        <button id="create-key-btn">新增 Key</button>
+        <input class="name" id="new-key-name" placeholder="名称">
+        <input class="quota" id="new-key-quota" placeholder="额度 token（默认 1000000）" type="number">
+        <button id="create-key-btn">新建</button>
       </div>
       <table>
-        <thead><tr><th>名称</th><th>Key</th><th>状态</th><th>额度</th><th>剩余</th><th>创建时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>名称</th><th>Key</th><th>状态</th><th>额度</th><th>剩余</th><th>创建</th><th></th></tr></thead>
         <tbody id="keys-tbody"></tbody>
       </table>
     </div>
 
-    <!-- 最近日志 -->
-    <div class="logs-section">
-      <h3>📜 最近请求（<span id="log-count">0</span>）</h3>
+    <div class="section">
+      <div class="section-title">最近请求</div>
       <table class="log-table">
-        <thead><tr><th>时间</th><th>模型</th><th>状态</th><th>TTFT</th><th>输入</th><th>输出</th><th>Key</th><th>费用</th></tr></thead>
+        <thead><tr><th>时间</th><th>模型</th><th>状态</th><th>TTFT</th><th>耗时</th><th>入</th><th>出</th><th>Key</th></tr></thead>
         <tbody id="logs-tbody"></tbody>
       </table>
     </div>
 
-    <!-- 模型价格 -->
-    <div class="models-section">
-      <h3>💰 主流模型官方价格（$ / 1M tokens）</h3>
+    <div class="section">
+      <div class="section-title">模型价格 <span class="source-tag" id="models-source"></span></div>
       <table>
         <thead><tr><th>模型</th><th>提供商</th><th>输入</th><th>输出</th><th>备注</th></tr></thead>
         <tbody id="models-tbody"></tbody>
@@ -180,56 +191,61 @@
 
 <script>
 const $ = id => document.getElementById(id);
-
-// ---- 登录状态 ----
 let adminKey = sessionStorage.getItem('apiProxyAdminKey') || '';
-
 const charts = {};
 
 function initCharts() {
-  Chart.defaults.color = '#94a3b8';
-  Chart.defaults.borderColor = '#1e293b';
+  const grid = 'rgba(0,0,0,.06)';
+  Chart.defaults.color = '#86868b';
+  Chart.defaults.borderColor = 'transparent';
+  Chart.defaults.font.family = '-apple-system, "Helvetica Neue", "PingFang SC", sans-serif';
+  Chart.defaults.font.size = 11;
+
   charts.requests = new Chart($('chart-requests'), {
     type: 'bar',
-    data: { labels: [], datasets: [
-      { label: '请求', data: [], backgroundColor: 'rgba(59,130,246,.6)', yAxisID: 'y' },
-      { label: '429', data: [], backgroundColor: 'rgba(248,113,113,.5)', yAxisID: 'y' },
-    ]},
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    data: { labels: [], datasets: [{ label: '请求', data: [], backgroundColor: 'rgba(0,0,0,.85)', barPercentage: .6 }] },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: grid } } } }
   });
   charts.tokens = new Chart($('chart-tokens'), {
     type: 'bar',
     data: { labels: [], datasets: [
-      { label: '输入', data: [], backgroundColor: 'rgba(16,185,129,.55)' },
-      { label: '输出', data: [], backgroundColor: 'rgba(251,191,36,.55)' },
+      { label: '入', data: [], backgroundColor: 'rgba(0,0,0,.45)', barPercentage: .6 },
+      { label: '出', data: [], backgroundColor: 'rgba(0,0,0,.85)', barPercentage: .6 },
     ]},
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8 } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: grid } } } }
   });
-  charts.ttft = new Chart($('chart-ttft'), {
+  charts.latency = new Chart($('chart-latency'), {
     type: 'line',
     data: { labels: [], datasets: [
-      { label: 'TTFT(ms)', data: [], borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,.15)', tension: .3, fill: true },
+      { label: 'TTFT', data: [], borderColor: '#1d1d1f', backgroundColor: 'rgba(0,0,0,.04)', tension: .3, pointRadius: 0 },
+      { label: '总耗时', data: [], borderColor: '#a1a1a6', backgroundColor: 'transparent', tension: .3, pointRadius: 0, borderDash: [4, 3] },
     ]},
-    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8 } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: grid } } } }
   });
 }
 
 function fmtTokens(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return String(n);
+  return String(n || 0);
 }
 function fmtTime(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
-  return d.toLocaleTimeString('zh-CN', { hour12: false }) + ' ' + d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 function fmtCost(c) {
   if (!c || c <= 0.0001) return '$0';
-  return '$' + c.toFixed(4);
+  return '$' + (+c).toFixed(4);
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// ---- 数据加载 ----
 async function api(path, opts = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
   if (adminKey) headers['Authorization'] = 'Bearer ' + adminKey;
@@ -243,18 +259,17 @@ async function loadStats() {
     const d = await api('/admin/api/stats');
     const t = d.totals || {};
     $('c-requests').textContent = t.requests || 0;
-    $('c-tokens').textContent = fmtTokens(t.totalTokens || 0);
+    $('c-tokens').textContent = fmtTokens(t.totalTokens);
     $('c-ttft').textContent = d.avgTtft != null ? d.avgTtft : '—';
+    $('c-lat').textContent = d.avgLatency != null ? d.avgLatency : '—';
     $('c-429').textContent = t.err429 || 0;
     $('c-cost').textContent = fmtCost(t.cost);
-    const uptime = d.uptimeSec ? Math.round(d.uptimeSec / 60) + ' min' : '—';
-    $('meta-info').textContent = '运行时长 ' + uptime + ' · 模型 ' + (d.models || []).length + ' 个 · 日志 ' + (d.logs || []).length + ' 条';
+    $('meta-info').textContent = `运行 ${d.uptimeSec ? Math.round(d.uptimeSec / 60) : 0} 分钟 · ${(d.models || []).length} 个模型 · 最近 ${(d.logs || []).length} 条请求`;
 
     const minutes = d.minutes || [];
     const labels = minutes.map(m => m.t.slice(11));
     charts.requests.data.labels = labels;
     charts.requests.data.datasets[0].data = minutes.map(m => m.requests);
-    charts.requests.data.datasets[1].data = minutes.map(m => m.err429);
     charts.requests.update('none');
 
     charts.tokens.data.labels = labels;
@@ -262,104 +277,85 @@ async function loadStats() {
     charts.tokens.data.datasets[1].data = minutes.map(m => m.outputTokens);
     charts.tokens.update('none');
 
-    charts.ttft.data.labels = labels;
-    charts.ttft.data.datasets[0].data = minutes.map(m => m.ttftAvg);
-    charts.ttft.update('none');
+    charts.latency.data.labels = labels;
+    charts.latency.data.datasets[0].data = minutes.map(m => m.ttftAvg);
+    charts.latency.data.datasets[1].data = minutes.map(m => m.latencyAvg);
+    charts.latency.update('none');
 
     renderLogs(d.logs || []);
   } catch (e) {
-    if (e.message === 'UNAUTHORIZED') { showLogin(); }
+    if (e.message === 'UNAUTHORIZED') showLogin();
   }
 }
 
 function renderLogs(logs) {
-  $('log-count').textContent = logs.length;
   const tb = $('logs-tbody');
-  tb.innerHTML = logs.map(l => {
-    const stCls = l.status >= 400 ? 'status-err' : 'status-ok';
-    return `<tr>
+  tb.innerHTML = logs.map(l => `
+    <tr>
       <td>${fmtTime(l.ts)}</td>
-      <td>${escapeHtml(l.model || '—')}</td>
-      <td class="${stCls}">${l.status}</td>
-      <td>${l.ttft != null ? l.ttft + 'ms' : '—'}</td>
-      <td>${fmtTokens(l.inputTokens || 0)}</td>
-      <td>${fmtTokens(l.outputTokens || 0)}</td>
-      <td>${escapeHtml(l.keyName || '—')}</td>
-      <td>${fmtCost(l.cost)}</td>
-    </tr>`;
-  }).join('');
+      <td>${esc(l.model || '—')}</td>
+      <td class="${l.status >= 400 ? 'status-err' : 'status-ok'}">${l.status}</td>
+      <td class="num">${l.ttft != null ? l.ttft + 'ms' : '—'}</td>
+      <td class="num">${l.latency != null ? l.latency + 'ms' : '—'}</td>
+      <td class="num">${fmtTokens(l.inputTokens)}</td>
+      <td class="num">${fmtTokens(l.outputTokens)}</td>
+      <td>${esc(l.keyName || '—')}</td>
+    </tr>`).join('');
 }
 
 async function loadKeys() {
   try {
     const d = await api('/admin/api/keys');
     const tb = $('keys-tbody');
-    tb.innerHTML = (d.keys || []).map(k => {
-      const pct = k.totalQuota ? Math.min(100, Math.round(k.quota / k.totalQuota * 100)) : 0;
-      const stCls = k.enabled ? 'on' : 'off';
-      return `<tr>
-        <td>${escapeHtml(k.name)}</td>
-        <td><span class="key-value" title="点击复制" onclick="copyKey('${k.key}')">${k.key.slice(0, 16)}…</span></td>
-        <td><span class="badge ${stCls}">${k.enabled ? '启用' : '禁用'}</span></td>
-        <td>${fmtTokens(k.totalQuota)}</td>
-        <td><div class="quota-bar"><span style="width:${pct}%"></span></div> ${fmtTokens(k.quota)}</td>
-        <td>${fmtTime(k.createdAt)}</td>
-        <td>
+    tb.innerHTML = (d.keys || []).map(k => `
+      <tr>
+        <td>${esc(k.name)}</td>
+        <td><span class="key-value" title="点击复制" onclick="copyKey('${k.key}')">${k.key.slice(0, 18)}…</span></td>
+        <td><span class="badge ${k.enabled ? 'on' : 'off'}">${k.enabled ? '启用' : '禁用'}</span></td>
+        <td class="num">${fmtTokens(k.totalQuota)}</td>
+        <td class="num">${fmtTokens(k.quota)}</td>
+        <td class="num">${fmtTime(k.createdAt)}</td>
+        <td style="text-align:right">
           <span class="op-link" onclick="toggleKey('${k.key}', ${!k.enabled})">${k.enabled ? '禁用' : '启用'}</span>
           <span class="op-link danger" onclick="delKey('${k.key}')">删除</span>
         </td>
-      </tr>`;
-    }).join('');
-  } catch (e) {
-    if (e.message === 'UNAUTHORIZED') showLogin();
-  }
+      </tr>`).join('');
+  } catch (e) { if (e.message === 'UNAUTHORIZED') showLogin(); }
 }
 
 async function loadModels() {
   try {
     const d = await api('/admin/api/models');
     const tb = $('models-tbody');
+    $('models-source').textContent = d.source === 'upstream' ? `· 来自端点 /v1/models（${d.count}）` : `· 内置价格表（端点不可达）`;
     tb.innerHTML = (d.models || []).map(m => `
       <tr>
-        <td>${escapeHtml(m.id)}</td>
-        <td>${escapeHtml(m.provider)}</td>
-        <td>$${m.input}</td>
-        <td>$${m.output}</td>
-        <td style="color:#94a3b8">${escapeHtml(m.note || '')}</td>
+        <td>${esc(m.id)}</td>
+        <td>${esc(m.provider)}</td>
+        <td class="num">${m.input != null ? '$' + m.input : '<span class="price-na">—</span>'}</td>
+        <td class="num">${m.output != null ? '$' + m.output : '<span class="price-na">—</span>'}</td>
+        <td class="price-na">${esc(m.note || '')}</td>
       </tr>`).join('');
   } catch (_) {}
 }
 
-// ---- 操作 ----
-function copyKey(k) {
-  navigator.clipboard.writeText(k).then(() => toast('已复制'));
-}
-function toast(msg) { alert(msg); }
-
+function copyKey(k) { navigator.clipboard.writeText(k).then(() => alert('已复制')); }
 async function toggleKey(key, enable) {
-  await api('/admin/api/keys/toggle', {
-    method: 'POST', body: JSON.stringify({ key, enabled: enable })
-  });
+  await api('/admin/api/keys/toggle', { method: 'POST', body: JSON.stringify({ key, enabled: enable }) });
   loadKeys();
 }
 async function delKey(key) {
   if (!confirm('确定删除该 Key？')) return;
-  await api('/admin/api/keys/delete', {
-    method: 'POST', body: JSON.stringify({ key })
-  });
+  await api('/admin/api/keys/delete', { method: 'POST', body: JSON.stringify({ key }) });
   loadKeys();
 }
 
-// ---- 登录 UI ----
 function showLogin() {
-  adminKey = '';
-  sessionStorage.removeItem('apiProxyAdminKey');
-  $('login-page').style.display = 'block';
-  $('panel').style.display = 'none';
+  adminKey = ''; sessionStorage.removeItem('apiProxyAdminKey');
+  $('login-page').style.display = 'block'; $('panel').style.display = 'none';
 }
 function showPanel() {
-  $('login-page').style.display = 'none';
-  $('panel').style.display = 'block';
+  $('login-page').style.display = 'none'; $('panel').style.display = 'block';
   loadStats(); loadKeys(); loadModels();
 }
 
@@ -367,42 +363,25 @@ document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   $('login-btn').addEventListener('click', async () => {
     const key = $('login-key').value.trim();
-    if (!key) { $('login-err').textContent = '请输入管理 Key'; return; }
+    if (!key) return;
     adminKey = key;
     sessionStorage.setItem('apiProxyAdminKey', key);
-    try {
-      await api('/admin/api/stats'); // 验证
-      $('login-err').textContent = '';
-      showPanel();
-    } catch (e) {
-      $('login-err').textContent = 'Key 无效，无法访问管理 API';
-    }
+    try { await api('/admin/api/stats'); $('login-err').textContent = ''; showPanel(); }
+    catch (e) { $('login-err').textContent = '密钥无效'; }
   });
   $('login-key').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
   $('logout-btn').addEventListener('click', showLogin);
   $('create-key-btn').addEventListener('click', async () => {
     const name = $('new-key-name').value.trim();
     const quota = parseInt($('new-key-quota').value, 10);
-    if (!name) { toast('请输入名称'); return; }
-    await api('/admin/api/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name, quota: quota > 0 ? quota : 1000000 })
-    });
-    $('new-key-name').value = '';
-    $('new-key-quota').value = '';
+    if (!name) { alert('请输入名称'); return; }
+    await api('/admin/api/keys', { method: 'POST', body: JSON.stringify({ name, quota: quota > 0 ? quota : 1000000 }) });
+    $('new-key-name').value = ''; $('new-key-quota').value = '';
     loadKeys();
   });
-
   if (adminKey) showPanel(); else showLogin();
-  // 动态刷新
-  setInterval(() => {
-    if (adminKey && $('panel').style.display !== 'none') { loadStats(); loadKeys(); }
-  }, 5000);
+  setInterval(() => { if (adminKey && $('panel').style.display !== 'none') { loadStats(); loadKeys(); } }, 5000);
 });
-
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 </script>
 </body>
 </html>

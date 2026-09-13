@@ -139,10 +139,13 @@ async function proxyRequest(req, res, apiKey) {
     return { status, handled: true, body: '', contentType, authorization, usage, ttft, model: reqModel };
   }
 
-  // 非流式 / 错误响应：读完整文本
+  // 非流式 / 错误响应：读完整文本（记录 latency 总耗时，不做为 TTFT）
   const responseText = await response.text();
-  if (status < 400) ttft = Date.now() - startTs; // 非流式：首字≈响应完成（完整返回）
-  return { status, handled: false, body: responseText, contentType, authorization, usage: extractUsageFromBody(responseText), ttft, model: reqModel };
+  return {
+    status, handled: false, body: responseText, contentType, authorization,
+    usage: extractUsageFromBody(responseText), ttft: null,
+    latency: Date.now() - startTs, model: reqModel,
+  };
 }
 
 // ---- 管理 API 鉴权 ----
@@ -174,10 +177,45 @@ async function handleAdminApi(req, res, pathname) {
   let parsedBody = {};
   try { parsedBody = JSON.parse(bodyText || '{}'); } catch (_) {}
 
-  // /admin/api/models 允许无鉴权展示（价格表是公开信息）；其余管理 API 需鉴权
+  // /admin/api/models：从上游 /v1/models 拉真实模型列表，只保留端点里有的模型 + 价格表匹配价格
   if (pathname === '/admin/api/models') {
-    const { MODELS } = require('../lib/models');
-    return res.status(200).json({ models: MODELS });
+    const { MODELS, lookupModel } = require('../lib/models');
+    let upstreamModels = null;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const resp = await fetch(`${BASE_URL}/v1/models`, {
+        headers: { Authorization: `Bearer ${API_KEYS[0] || ''}` },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Array.isArray(data.data)) {
+          upstreamModels = data.data.map(m => m.id || m);
+        }
+      }
+    } catch (e) {
+      console.error('[models] upstream fetch failed:', e.message);
+    }
+
+    if (upstreamModels) {
+      // 只保留端点里有的模型
+      const live = upstreamModels.map(id => {
+        const price = lookupModel(id);
+        return {
+          id,
+          provider: price ? price.provider : '—',
+          input: price ? price.input : null,
+          output: price ? price.output : null,
+          note: price ? price.note : '（端点模型，暂无价格数据）',
+        };
+      });
+      return res.status(200).json({ models: live, source: 'upstream', count: live.length });
+    }
+
+    // 上游不可达时退回内置价格表（标注 source）
+    return res.status(200).json({ models: MODELS, source: 'builtin', count: MODELS.length });
   }
 
   if (!adminAuthed) {
@@ -322,6 +360,7 @@ module.exports = async (req, res) => {
         model: result.model,
         status: result.status,
         ttft: result.ttft,
+        latency: result.latency,
         inputTokens,
         outputTokens,
         keyName,
@@ -364,6 +403,7 @@ module.exports = async (req, res) => {
       model: lastResult.model,
       status: lastResult.status,
       ttft: lastResult.ttft,
+      latency: lastResult.latency,
       inputTokens: usage.prompt_tokens || usage.input_tokens || 0,
       outputTokens: usage.completion_tokens || usage.output_tokens || 0,
       keyName,
