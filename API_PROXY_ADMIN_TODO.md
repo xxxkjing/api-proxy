@@ -37,3 +37,13 @@
 ## 备注
 - 转发路径：客户端 Authorization 用管理 key 或生成的 sk-xxx；上游仍走 RPM 轮询池
 - 流式 token 统计：优先 stream_options.include_usage 的 SSE usage chunk；非流式从响应 json 的 usage 解析
+
+## S5 EdgeOne 兼容（2026-09-13 用户要求）
+- [ ] lib/core.js 平台无关核心（工厂模式，完成）
+- [ ] lib/store.js 无 fs 环境兼容 + Web Crypto 随机数
+- [ ] lib/admin-page.js 内嵌 HTML（EdgeOne 无文件系统）
+- [ ] api/index.js Vercel 薄适配器
+- [ ] scripts/build-edgeone.mjs 打包单文件 worker
+- [ ] edgeone 入口 addEventListener('fetch') + 流式 ReadableStream
+- [ ] 本地模拟 EdgeOne 测试
+- [ ] 推送 GitHub

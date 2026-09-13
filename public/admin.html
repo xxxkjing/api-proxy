@@ -83,6 +83,7 @@
   .key-form input:focus { border-color: var(--accent); }
   .key-form .name { width: 180px; }
   .key-form .quota { width: 160px; }
+  .key-form .models { width: 260px; }
   .key-form button {
     padding: 9px 22px; border: none; border-radius: 10px;
     background: var(--ink); color: #fff; font-size: 14px; cursor: pointer;
@@ -163,10 +164,11 @@
       <div class="key-form">
         <input class="name" id="new-key-name" placeholder="名称">
         <input class="quota" id="new-key-quota" placeholder="额度 token（默认 1000000）" type="number">
+        <input class="models" id="new-key-models" placeholder="可选：限制模型（逗号分隔，留空不限）">
         <button id="create-key-btn">新建</button>
       </div>
       <table>
-        <thead><tr><th>名称</th><th>Key</th><th>状态</th><th>额度</th><th>剩余</th><th>创建</th><th></th></tr></thead>
+        <thead><tr><th>名称</th><th>Key</th><th>状态</th><th>额度</th><th>剩余</th><th>模型</th><th>创建</th><th></th></tr></thead>
         <tbody id="keys-tbody"></tbody>
       </table>
     </div>
@@ -314,6 +316,7 @@ async function loadKeys() {
         <td><span class="badge ${k.enabled ? 'on' : 'off'}">${k.enabled ? '启用' : '禁用'}</span></td>
         <td class="num">${fmtTokens(k.totalQuota)}</td>
         <td class="num">${fmtTokens(k.quota)}</td>
+        <td class="num" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${k.models && k.models.length ? esc(k.models.join(', ')) : '<span class="price-na">不限</span>'}</td>
         <td class="num">${fmtTime(k.createdAt)}</td>
         <td style="text-align:right">
           <span class="op-link" onclick="toggleKey('${k.key}', ${!k.enabled})">${k.enabled ? '禁用' : '启用'}</span>
@@ -374,9 +377,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('create-key-btn').addEventListener('click', async () => {
     const name = $('new-key-name').value.trim();
     const quota = parseInt($('new-key-quota').value, 10);
+    const modelsStr = $('new-key-models').value.trim();
     if (!name) { alert('请输入名称'); return; }
-    await api('/admin/api/keys', { method: 'POST', body: JSON.stringify({ name, quota: quota > 0 ? quota : 1000000 }) });
-    $('new-key-name').value = ''; $('new-key-quota').value = '';
+    await api('/admin/api/keys', { method: 'POST', body: JSON.stringify({
+      name,
+      quota: quota > 0 ? quota : 1000000,
+      models: modelsStr ? modelsStr.split(',').map(s => s.trim()).filter(Boolean) : null,
+    }) });
+    $('new-key-name').value = ''; $('new-key-quota').value = ''; $('new-key-models').value = '';
     loadKeys();
   });
   if (adminKey) showPanel(); else showLogin();
