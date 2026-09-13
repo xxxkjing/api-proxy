@@ -3,6 +3,14 @@
   "name": "api-proxy",
   "routes": [
     {
+      "src": "/admin(/?)",
+      "dest": "/api/index"
+    },
+    {
+      "src": "/admin/api/(.*)",
+      "dest": "/api/index"
+    },
+    {
       "src": "/v1/(.*)",
       "dest": "/api/index"
     },
