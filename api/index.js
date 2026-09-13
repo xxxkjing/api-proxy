@@ -3,20 +3,35 @@ const API_KEYS = process.env.KEYS || process.env.API_KEYS ?
   [];
 const BASE_URL = process.env.BASE_URL || 'https://api.openai.com';
 
-// 每个 key 的状态：lastUsed 上次调用时间戳（用于冷却）、callCount 累计调用次数（用于选最没调用的）
-let keyStates = API_KEYS.map(key => ({ key, lastUsed: 0, callCount: 0 }));
-const COOLDOWN_MS = 5000; // 每次调用后冷却 5 秒
+// 每个 key 的状态：coolUntil 冷却结束时间戳、callCount 累计调用次数
+let keyStates = API_KEYS.map(key => ({ key, coolUntil: 0, callCount: 0 }));
 
+// 冷却时长：基于上游 RPM（默认 8 → 每 key 至少 7.5s），留 10% 余量；可用 COOLDOWN_MS 覆盖
+const RPM = Number(process.env.RPM) || 8;
+const COOLDOWN_MS = Number(process.env.COOLDOWN_MS) || Math.ceil(60000 / RPM * 1.1);
+const PENALTY_MS = COOLDOWN_MS * 2; // 429 惩罚：双倍冷却
+
+/**
+ * 冷却感知选 key：
+ * - 有已冷却的 key → 从中随机挑（负载均衡 + 零等待）
+ * - 全部在冷却 → 挑「最早恢复」的 key（本次等待时间最短）
+ * - preferLeastUsed：429 场景优先「累计调用最少」的已冷却 key；全冷却时同规则退化
+ */
 function pickKey({ preferLeastUsed = false } = {}) {
   const now = Date.now();
-  // 默认只从未冷却的 key 里随机选；全冷却时退化为全部
-  let pool = keyStates.filter(k => now - k.lastUsed >= COOLDOWN_MS);
+  let pool = keyStates.filter(k => k.coolUntil <= now);
   if (!pool.length) pool = [...keyStates];
   if (!pool.length) return null;
-  // 429 场景：选「最没调用过」的（callCount 最小，并列则随机）
-  if (preferLeastUsed) {
+
+  if (preferLeastUsed && pool.length > 1) {
     const min = Math.min(...pool.map(k => k.callCount));
-    pool = pool.filter(k => k.callCount === min);
+    const least = pool.filter(k => k.callCount === min);
+    if (least.length) pool = least;
+  }
+
+  // 全冷却时（pool === keyStates）：选最早恢复的；否则从可用里随机
+  if (pool.length === keyStates.length && keyStates.some(k => k.coolUntil > now)) {
+    return pool.reduce((a, b) => (a.coolUntil <= b.coolUntil ? a : b));
   }
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -90,16 +105,29 @@ module.exports = async (req, res) => {
     // 正常时随机选未冷却 key；遇到 429 后改选「最没调用过」的 key
     const state = pickKey({ preferLeastUsed: hit429 });
     if (!state) break;
-    state.lastUsed = Date.now(); // 调用即进入冷却
+
+    // 全冷却时精确等待最早恢复的 key（保证本次回答等待时间最短）
+    const nowMs = Date.now();
+    const allCooling = keyStates.every(k => k.coolUntil > nowMs);
+    if (allCooling) {
+      const earliest = keyStates.reduce((a, b) => (a.coolUntil <= b.coolUntil ? a : b));
+      const waitMs = earliest.coolUntil - nowMs;
+      if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
+    }
+
+    // 等待期间可能已有其他 key 恢复，重新选一次（preferLeastUsed 状态保留）
+    const finalState = pickKey({ preferLeastUsed: hit429 }) || state;
+    finalState.coolUntil = Date.now() + COOLDOWN_MS; // 调用后进入冷却
 
     try {
-      const result = await proxyRequest(req, state.key);
-      state.callCount += 1;
+      const result = await proxyRequest(req, finalState.key);
+      finalState.callCount += 1;
 
       if (result.status === 429) {
         hit429 = true;
         attempts += 1;
-        console.warn(`Key ${state.key.slice(0, 8)}... -> 429, switching to least-used key (${attempts}/${maxAttempts})`);
+        finalState.coolUntil = Date.now() + PENALTY_MS; // 429 惩罚：双倍冷却，防止继续踩雷
+        console.warn(`Key ${finalState.key.slice(0, 8)}... -> 429, penalized ${PENALTY_MS}ms (${attempts}/${maxAttempts})`);
         continue; // 不返回，直接换 key 重试
       }
 
@@ -114,7 +142,8 @@ module.exports = async (req, res) => {
       return;
     } catch (error) {
       console.error('Proxy error:', error);
-      state.callCount += 1;
+      finalState.callCount += 1;
+      finalState.coolUntil = Date.now() + PENALTY_MS; // 网络错误也惩罚，避免连续踩同一个
       attempts += 1;
     }
   }
