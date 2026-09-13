@@ -32,7 +32,7 @@
 - [x] 单元测试：key 生成/校验/扣费、统计聚合
 - [x] 集成测试：mock 上游 + 管理 API + 转发扣费
 - [x] vercel.json 路由更新（/admin）
-- [ ] 推送 GitHub + 部署验证（当前进行中）
+- [ ] 推送 GitHub + 部署验证（**阻塞：GitHub 443 连接不稳定连续失败，本地 2 commit 待推：54f7c24+b9ae61c，远程在 1717876；网络恢复后 git push origin HEAD 即可**）
 
 ## 备注
 - 转发路径：客户端 Authorization 用管理 key 或生成的 sk-xxx；上游仍走 RPM 轮询池
