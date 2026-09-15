@@ -24,9 +24,10 @@ const storeSrc = read('lib/store.js')
 const modelsSrc = read('lib/models.js');
 const adminSrc = read('lib/admin-page.js');
 const coreSrc = read('lib/core.js')
-  .replace("const store = localRequire(config.storePath || '../lib/store');", "const store = __requireModule('lib/store.js');")
-  .replace("const { MODELS, lookupModel } = localRequire(config.modelsPath || '../lib/models');", "const { MODELS, lookupModel } = __requireModule('lib/models.js');")
-  .replace("const adminHtml = localRequire(config.adminPagePath || '../lib/admin-page.js');", "const adminHtml = __requireModule('lib/admin-page.js');");
+  // core.js 顶部依赖改造成打包器模块查找（EdgeOne 无 require）
+  .replace("const store = require('../lib/store');", "const store = __requireModule('lib/store.js');")
+  .replace("const { MODELS, lookupModel } = require('../lib/models');", "const { MODELS, lookupModel } = __requireModule('lib/models.js');")
+  .replace("const adminHtml = require('../lib/admin-page.js');", "const adminHtml = __requireModule('lib/admin-page.js');");
 
 const worker = `// EdgeOne Edge Function — api-proxy（由 scripts/build-edgeone.mjs 生成，勿手改）
 // 部署：EdgeOne 控制台 → 边缘函数 → 新建/编辑 → 粘贴本文件 → 部署 → 配置触发规则 → 环境变量

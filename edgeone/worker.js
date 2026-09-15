@@ -344,23 +344,17 @@ const __coreFactory = function() {
     // reqLike: { method, url, headers(对象或Headers实例), body(string|null) }
     // resLike: { status, headers(对象), chunks(异步迭代器|null, 流式), body(string|null, 非流式) }
     // 兼容 Vercel(Node req/res) 与 EdgeOne(Service Worker fetch)
+    // ⚠️ 依赖必须用静态 require（Vercel 静态追踪绕过变量路径），EdgeOne 由打包脚本替换为 __requireModule
     
-    // 兼容打包器注入的模块（无 require 时用全局注册表）
-    function localRequire(name) {
-      if (typeof globalThis.__apiproxy_modules !== 'undefined' && globalThis.__apiproxy_modules[name]) {
-        return globalThis.__apiproxy_modules[name];
-      }
-      return require(name);
-    }
+    const store = __requireModule('lib/store.js');
+    const { MODELS, lookupModel } = __requireModule('lib/models.js');
+    const adminHtml = __requireModule('lib/admin-page.js');
     
     return function createHandler(config) {
       const rawKeys = config.API_KEYS || [];
       const API_KEYS = rawKeys.map(k => String(k).trim()).filter(Boolean);
       const BASE_URL = config.BASE_URL || 'https://api.openai.com';
       const ADMIN_KEY = config.ADMIN_KEY || '';
-      const store = __requireModule('lib/store.js');
-      const { MODELS, lookupModel } = __requireModule('lib/models.js');
-      const adminHtml = __requireModule('lib/admin-page.js');
     
       // 每个 key 的状态：coolUntil 冷却结束时间戳、callCount 累计调用次数
       let keyStates = API_KEYS.map(key => ({ key, coolUntil: 0, callCount: 0 }));
