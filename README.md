@@ -26,6 +26,9 @@
         | `YOUR_VERCEL_APP_API_KEY`   | 是（启用鉴权时） | 管理面板登录密码 + 管理 API 鉴权 + 转发时的管理员 key。 | 无（不设置则转发不鉴权、管理 API 不可用） |
         | `RPM`   | 否   | 上游单 key 每分钟请求上限，冷却时间按 `60/RPM*1.1` 计算。 | `8` |
         | `COOLDOWN_MS`   | 否   | 覆盖冷却时长（毫秒），优先级高于 RPM。 | 无 |
+        | `GITHUB_TOKEN`   | 否   | 云端持久化：GitHub PAT（需 repo 权限）。配置后数据永久存云端，不配则退化为纯内存（重启丢失）。 | 无 |
+        | `GITHUB_REPO`   | 否   | 云端存储仓库 `owner/repo`。 | `xxxkjing/api-proxy-data` |
+        | `GITHUB_BRANCH`   | 否   | 存储仓库分支。 | `main` |
 
 2. **使用代理地址:**
 
@@ -59,7 +62,7 @@
 ## 提示
 
 *   `BASE_URL` 可以根据你的需要进行配置，例如你可以将其设置为其他 API 服务的地址，比如 `https://api.example.com`。
-*   ⚠️ **存储说明**：当前为内存存储（无数据库），Vercel 冷启动后 key/统计会重置。若需持久化，请自行接 Neon/Postgres。
+*   **云端持久化（无数据库、无本地存储）**：配置 `GITHUB_TOKEN` 后，数据自动存到 GitHub 私有仓库——热数据（key/统计）存 `store.json`，日志按天归档到 `logs/YYYY-MM-DD.json`（只追加不删，长期保存）。不配 token 则退化为纯内存（Vercel 冷启动丢失）。
 *   费用估算按内置模型价格表（`lib/models.js`）计算，未收录的模型不计费。
 
 **就这些！尽情享用吧！**
