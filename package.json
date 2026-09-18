@@ -9,8 +9,9 @@
     "test": "node test/proxy.test.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "dotenv": "^16.0.3"
+    "@vercel/blob": "^2.8.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2"
   },
   "engines": {
     "node": ">=18"
